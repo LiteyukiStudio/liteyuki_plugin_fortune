@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Union
 
 from nonebot import get_driver
 from nonebot.log import logger
-from pydantic import BaseModel, Extra, root_validator
+from pydantic import BaseModel, root_validator
 
 from .download import ResourceError, download_resource
 
@@ -23,7 +23,16 @@ FortuneThemesDict: Dict[str, List[str]] = {
     "einstein": ["爱因斯坦携爱敬上", "爱因斯坦", "einstein", "Einstein"],
     "genshin": ["原神", "Genshin Impact", "genshin", "Genshin", "op", "原批"],
     "granblue_fantasy": ["碧蓝幻想", "Granblue Fantasy", "granblue fantasy", "幻想"],
-    "hololive": ["Hololive", "hololive", "Vtb", "vtb", "管人", "Holo", "holo", "管人痴"],
+    "hololive": [
+        "Hololive",
+        "hololive",
+        "Vtb",
+        "vtb",
+        "管人",
+        "Holo",
+        "holo",
+        "管人痴",
+    ],
     "hoshizora": ["星空列车与白的旅行", "星空列车"],
     "liqingge": ["李清歌", "清歌"],
     "onmyoji": ["阴阳师", "yys", "Yys", "痒痒鼠"],
@@ -40,11 +49,11 @@ FortuneThemesDict: Dict[str, List[str]] = {
 }
 
 
-class PluginConfig(BaseModel, extra=Extra.ignore):
+class PluginConfig(BaseModel, extra="ignore"):
     fortune_path: Path = Path(__file__).parent / "resource"
 
 
-class ThemesFlagConfig(BaseModel, extra=Extra.ignore):
+class ThemesFlagConfig(BaseModel, extra="ignore"):
     """
     Switches of themes only valid in random divination.
     Make sure NOT ALL FALSE!
@@ -73,7 +82,7 @@ class ThemesFlagConfig(BaseModel, extra=Extra.ignore):
     touhou_old_flag: bool = True
     warship_girls_r_flag: bool = True
 
-    @root_validator
+    @root_validator(skip_on_failure=True)
     def check_all_disabled(cls, values) -> None:
         """Check whether all themes are DISABLED"""
         flag: bool = False
@@ -83,7 +92,7 @@ class ThemesFlagConfig(BaseModel, extra=Extra.ignore):
                 break
 
         if not flag:
-            raise ValueError("Fortune themes ALL disabled! Please check!")
+            raise ValueError("幸运抽的主题已*全部*禁用，这可如何是好？")
 
         return values
 
@@ -118,10 +127,10 @@ async def fortune_check() -> None:
         fonts_path.mkdir(parents=True, exist_ok=True)
 
     if not (fonts_path / "Mamelon.otf").exists():
-        raise ResourceError("Resource Mamelon.otf is missing! Please check!")
+        raise ResourceError("存在无法找到的 Mamelon.otf 字体资源，请确保其存在于正确位置。")
 
     if not (fonts_path / "sakura.ttf").exists():
-        raise ResourceError("Resource sakura.ttf is missing! Please check!")
+        raise ResourceError("存在无法找到的 sakura.ttf 字体资源，请确保其存在于正确位置。")
 
     """
 		Try to get the latest copywriting from the repository.
@@ -134,7 +143,7 @@ async def fortune_check() -> None:
 
     ret = await download_resource(copywriting_path, "copywriting.json", "fortune")
     if not ret and not copywriting_path.exists():
-        raise ResourceError("Resource copywriting.json is missing! Please check!")
+        raise ResourceError("幸运抽文案缺失，请确保 copywriting.json 存在于正确位置。")
 
     """
 		Check rules and data files
@@ -145,7 +154,7 @@ async def fortune_check() -> None:
     specific_rules_path: Path = fortune_config.fortune_path / "specific_rules.json"
 
     if not fortune_data_path.exists():
-        logger.warning("Resource fortune_data.json is missing, initialized one...")
+        logger.warning("配置文件 fortune_data.json 不存在，正在初始化之……")
 
         with fortune_data_path.open("w", encoding="utf-8") as f:
             json.dump(dict(), f, ensure_ascii=False, indent=4)
@@ -156,9 +165,9 @@ async def fortune_check() -> None:
         2. Transfer the key "is_divined" to "last_sign_date"
         """
         with open(fortune_data_path, "r", encoding="utf-8") as f:
-            _data: Dict[
-                str, Dict[str, Dict[str, Union[str, bool, int, date]]]
-            ] = json.load(f)
+            _data: Dict[str, Dict[str, Dict[str, Union[str, bool, int, date]]]] = (
+                json.load(f)
+            )
 
         for gid in _data:
             if _data[gid]:
@@ -203,7 +212,9 @@ async def fortune_check() -> None:
             # Try to transfer from the old setting json
             ret = group_rules_transfer(fortune_setting_path, group_rules_path)
             if ret:
-                logger.info("旧版 fortune_setting.json 文件中群聊抽签主题设置已更新至 group_rules.json")
+                logger.info(
+                    "旧版 fortune_setting.json 文件中*群聊抽签主题设置*已更新至 group_rules.json"
+                )
                 _flag = True
 
         if not _flag:
@@ -211,7 +222,9 @@ async def fortune_check() -> None:
             with group_rules_path.open("w", encoding="utf-8") as f:
                 json.dump(dict(), f, ensure_ascii=False, indent=4)
 
-            logger.info("旧版 fortune_setting.json 文件中群聊抽签主题设置不存在，初始化 group_rules.json")
+            logger.info(
+                "旧版 fortune_setting.json 文件中，未找到*群聊抽签主题设置*，将以默认信息初始化 group_rules.json"
+            )
 
     _flag = False
     if not specific_rules_path.exists():
@@ -223,7 +236,9 @@ async def fortune_check() -> None:
                 # Delete the old fortune_setting json if the transfer is OK
                 fortune_setting_path.unlink()
 
-                logger.info("旧版 fortune_setting.json 文件中签底指定规则已更新至 specific_rules.json")
+                logger.info(
+                    "旧版 fortune_setting.json 文件中*签底指定规则*已更新至 specific_rules.json"
+                )
                 logger.warning("指定签底抽签功能将在 v0.5.0 弃用")
                 _flag = True
 
@@ -231,14 +246,14 @@ async def fortune_check() -> None:
             # Try to download it from repo
             ret = await download_resource(specific_rules_path, "specific_rules.json")
             if ret:
-                logger.info(f"Downloaded specific_rules.json from repo")
+                logger.info("正在从 GitHub 仓库下载 specific_rules.json 配置文件")
             else:
                 # If failed, initialize specific_rules.json instead
                 with specific_rules_path.open("w", encoding="utf-8") as f:
                     json.dump(dict(), f, ensure_ascii=False, indent=4)
 
                 logger.info(
-                    "旧版 fortune_setting.json 文件中签底指定规则不存在，初始化 specific_rules.json"
+                    "旧版 fortune_setting.json 文件中未找到*签底指定规则*，将以默认信息初始化 specific_rules.json"
                 )
                 logger.warning("指定签底抽签功能将在 v0.5.0 弃用")
 

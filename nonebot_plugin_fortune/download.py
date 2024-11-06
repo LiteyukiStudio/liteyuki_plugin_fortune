@@ -16,9 +16,9 @@ class ResourceError(Exception):
     __repr__ = __str__
 
 
-async def download_url(url: str) -> Optional[Dict[str, Any]]:
+async def download_url(url: str, retry_times: int = 3) -> Optional[Dict[str, Any]]:
     async with httpx.AsyncClient() as client:
-        for i in range(3):
+        for i in range(retry_times):
             try:
                 resp = await client.get(url, timeout=20)
                 if resp.status_code != 200:
@@ -26,10 +26,14 @@ async def download_url(url: str) -> Optional[Dict[str, Any]]:
 
                 return resp.json()
 
-            except Exception:
-                logger.warning(f"Error occurred when downloading {url}, retry: {i+1}/3")
+            except Exception as e:
+                logger.warning(
+                    "下载 {} 时出现错误：{}。正在尝试第 {}/{} 次。".format(
+                        url, e, i + 1, retry_times
+                    )
+                )
 
-    logger.warning("Abort downloading")
+    logger.warning("忽略下载错误")
     return None
 
 
@@ -40,7 +44,9 @@ async def download_resource(
     Try to download resources, json but not images.
     For fonts & copywriting, download and save into files when missing. Otherwise, raise ResourceError.
     """
-    base_url: str = "https://raw.fgit.ml/MinatoAquaCrews/nonebot_plugin_fortune/master/nonebot_plugin_fortune/resource"
+    base_url: str = (
+        "https://raw.fgit.ml/MinatoAquaCrews/nonebot_plugin_fortune/master/nonebot_plugin_fortune/resource"
+    )
 
     if isinstance(_type, str):
         url: str = base_url + "/" + _type + "/" + name
@@ -53,7 +59,7 @@ async def download_resource(
         if name == "copywriting.json":
             version: float = resp.get("version", 0)
             logger.info(
-                f"Got the latest copywriting.json from repo, version: {version}"
+                f"已从 GitHub 仓库获取最新的 copywriting.json 幸运抽文案，其版本为：{version}"
             )
 
         return True
